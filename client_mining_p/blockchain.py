@@ -3,13 +3,14 @@ import json
 from time import time
 from uuid import uuid4
 
-from flask import Flask, jsonify, Request
+from flask import Flask, jsonify, request
 
 
 class Blockchain(object):
     def __init__(self):
         self.chain = []
         self.current_transactions = []
+        self.nodes = set()
 
         # Create the genesis block
         self.new_block(previous_hash=1, proof=100)
@@ -39,14 +40,14 @@ class Blockchain(object):
         }
 
         # Reset the current list of transactions
-
-        # Append the chain to the block
         self.current_transaction = []
-        # Return the new block
+        # Append the chain to the block
         self.chain.append(block)
+        # Return the new block
         return block
 
-    def hash(self, block):
+    @staticmethod
+    def hash(block):
         """
         Creates a SHA-256 hash of a Block
 
@@ -64,10 +65,10 @@ class Blockchain(object):
 
         # TODO: Create the block_string
         string_object = json.dumps(block, sort_keys=True)
-        block_string = string_object.encode()
+        block_string = string_object
 
         # TODO: Hash this string using sha256
-        raw_hash = hashlib.sha256(block_string)
+        raw_hash = hashlib.sha256(block_string.encode())
         hex_hash = raw_hash.hexdigest()
 
         # By itself, the sha256 function returns the hash in a raw string
@@ -77,7 +78,7 @@ class Blockchain(object):
         # easier to work with and understand
 
         # TODO: Return the hashed block string in hexadecimal format
-        pass
+        return hex_hash
 
     @property
     def last_block(self):
@@ -119,9 +120,9 @@ class Blockchain(object):
         guess = f'{block_string}{proof}'.encode()
         guess_hash = hashlib.sha256(guess).hexdigest()
         # return True or False
-        if guess_hash[:6] == "000000":
-            print(guess)
-        return guess_hash[:6] == "000000"
+        # if guess_hash[:6] == "000000":
+        #     # print(guess)
+        return guess_hash[:4] == "0000"
 
 
 # Instantiate our Node
@@ -142,15 +143,29 @@ def mine():
     # previous_hash = blockchain.hash(blockchain.last_block)
     # block = blockchain.new_block(proof, previous_hash)
 
-    data = Request.get_json()
+    values = request.get_json()
+    required = ['proof', 'id']
 
-    if data.proof and data.id:
+    if not all(k in values for k in required):
+        response = {'message': "Missing Values"}
+        return jsonify(response), 400
+
+    submitted_proof = values.get('proof')
+
+    # determine if the proof is valid
+    last_block = blockchain.last_block
+    last_block_string = json.dumps(last_block, sort_keys=True)
+
+    if blockchain.valid_proof(last_block_string, submitted_proof):
+        previous_hash = blockchain.hash(last_block)
+        block = blockchain.new_block(submitted_proof, previous_hash)
+
         response = {
             'message': "New Block Forged",
-            'index': data['index'],
-            'transactions': data['transactions'],
-            'proof': data['proof'],
-            'previous_hash': data['previous_hash'],
+            'index': block['index'],
+            'transactions': block['transactions'],
+            'proof': block['proof'],
+            'previous_hash': block['previous_hash'],
             # Send a JSON response with the new block
         }
         return jsonify(response), 200
@@ -163,19 +178,8 @@ def mine():
 
 @app.route('/last_block', methods=['GET'])
 def last_block():
-    # # Run the proof of work algorithm to get the next proof
-    # proof = blockchain.proof_of_work(blockchain.last_block)
-    # # Forge the new Block by adding it to the chain with the proof
-    # previous_hash = blockchain.hash(blockchain.last_block)
-    # block = blockchain.new_block(proof, previous_hash)
-    lb = blockchain.last_block()
     response = {
-        'message': "Last Block",
-        'index': lb['index'],
-        'transactions': lb['transactions'],
-        'proof': lb['proof'],
-        'previous_hash': lb['previous_hash'],
-        # Send a JSON response with the new block
+        "last_block": blockchain.last_block
     }
     return jsonify(response), 200
 

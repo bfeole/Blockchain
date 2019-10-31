@@ -1,11 +1,10 @@
 import hashlib
 import requests
-
 import sys
 import json
 
 
-def proof_of_work(self, block):
+def proof_of_work(block):
     """
     Simple Proof of Work Algorithm
     Stringify the block and look for a proof.
@@ -13,14 +12,14 @@ def proof_of_work(self, block):
     in an effort to find a number that is a valid proof
     :return: A valid proof for the provided block
     """
-    block_string = json.dumps(block, sort_keys=True).encode()
+    block_string = json.dumps(block, sort_keys=True)
     proof = 0
-    while not self.valid_proof(block_string, proof):
+    while valid_proof(block_string, proof) is False:
         proof += 1
-    guess = f'{block_string}{proof}'.encode()
-    guess_hash = hashlib.sha256(guess).hexdigest()
-    print(guess)
-    print(guess_hash)
+    # guess = f'{block_string}{proof}'.encode()
+    # guess_hash = hashlib.sha256(guess).hexdigest()
+    # print(guess)
+    # print(guess_hash)
     return proof
 
 
@@ -38,12 +37,12 @@ def valid_proof(block_string, proof):
     # proof here is like salt, block string is the same salt in this case is changing until we find correct hash
     guess = f'{block_string}{proof}'.encode()
     guess_hash = hashlib.sha256(guess).hexdigest()
+    return guess_hash[:4] == "0000"
     # return True or False
-    if guess[:6] == "000000":
-        return True
-    else:
-        return False
-    # return guess_hash[:6] == "000000"
+    # if guess_hash[:4] == "0000":
+    #     return True
+    # else:
+    #     return False
 
 
 if __name__ == '__main__':
@@ -59,6 +58,8 @@ if __name__ == '__main__':
     print("ID is", id)
     f.close()
 
+    coins_mined = 0
+
     # Run forever until interrupted
     while True:
         r = requests.get(url=node + "/last_block")
@@ -71,16 +72,21 @@ if __name__ == '__main__':
             print(r)
             break
 
-        # TODO: Get the LAST block from `data` and use it to look for a new proof
-        new_proof = proof_of_work(data)
+    # TODO: Get the LAST block from `data` and use it to look for a new proof
+        new_proof = proof_of_work(data.get('last_block'))
 
-        # When found, POST it to the server {"proof": new_proof, "id": id}
+    # When found, POST it to the server {"proof": new_proof, "id": id}
         post_data = {"proof": new_proof, "id": id}
 
         r = requests.post(url=node + "/mine", json=post_data)
+        print(r)
         data = r.json()
 
-        # TODO: If the server responds with a 'message' 'New Block Forged'
-        # add 1 to the number of coins mined and print it.  Otherwise,
-        # print the message from the server.
-        pass
+    # TODO: If the server responds with a 'message' 'New Block Forged'
+    # add 1 to the number of coins mined and print it.  Otherwise,
+    # print the message from the server.
+        if data.get('message') == 'New Block Forged':
+            coins_mined += 1
+            print("Total coins mined: " + str(coins_mined))
+        else:
+            print(data.get('message'))
